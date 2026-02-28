@@ -75,3 +75,16 @@ in each cycle using waitpid(-1, ..., WNOHANG).
 > `$(...)`, not HollowShell. This may
 > lead to behavioral differences. A future implementation is planned to replace this with
 > a recursive call to the custom `Executor`.
+
+# Building
+```bash
+# Debug
+cmake --preset=debug
+cmake --build --preset=debug
+./build/debug/HollowShell/hollow_shell
+
+# Release
+cmake --preset=release
+cmake --build --preset=release
+./build/debug/HollowShell/hollow_shell
+```
