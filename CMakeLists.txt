@@ -1,7 +1,4 @@
-﻿# CMakeList.txt: файл проекта CMake верхнего уровня; проведите глобальную конфигурацию
-# и включите сюда подпроекты.
-
-cmake_minimum_required(VERSION 3.20)
+﻿cmake_minimum_required(VERSION 3.20)
 project(HollowShell VERSION 1.0.0 LANGUAGES CXX)
 add_subdirectory("HollowShell")
 target_compile_features(hollow_shell PRIVATE cxx_std_20)

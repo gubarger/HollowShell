@@ -1,7 +1,4 @@
-﻿# CMakeList.txt: проект CMake для HollowShell; включите исходный код и определения,
-# укажите здесь логику для конкретного проекта.
-
-add_executable (hollow_shell 
+﻿add_executable (hollow_shell 
 	"HollowShell.cpp" 
 	
 	"grammar/HollowLexer.cpp" 
