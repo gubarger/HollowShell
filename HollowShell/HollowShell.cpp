@@ -2,12 +2,15 @@
 
 #include <iostream>
 
+// clang-format off
 #include "exec/HollowEnvironment.h"
 #include "exec/HollowExecutor.h"
 #include "exec/HollowJob.h"
 #include "feature/HollowPrompt.h"
 #include "grammar/HollowLexer.h"
 #include "grammar/HollowParser.h"
+#include "utils/IgnoreSignal.h"
+// clang-format on
 
 #include <sys/wait.h>
 
@@ -19,6 +22,12 @@
 int
 main()
 {
+  setpgid(0, 0);
+  tcsetpgrp(STDIN_FILENO, getpgrp());
+
+  // Setting signal handler
+  SetupSignals();
+
   HollowExecutor executor;
   HollowPrompt prompt;
 
@@ -27,12 +36,28 @@ main()
   while (true) {
     HollowJob::GetInstance().ReapZombies();
 
+    gotSigint = 0;
+
     prompt.PrintPrompt(lastEc);
 
     std::string input;
 
     if (!std::getline(std::cin, input)) {
-      break; // Ctrl+D
+      if (gotSigint) {
+        gotSigint = 0;
+        std::cin.clear();
+
+        continue;
+      }
+
+      // Ctrl+D (EOF)
+      std::cout << "exit" << std::endl;
+      break;
+    }
+
+    if (gotSigint) {
+      gotSigint = 0;
+      continue;
     }
 
     if (input.empty()) {

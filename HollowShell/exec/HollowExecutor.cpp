@@ -81,20 +81,31 @@ HollowExecutor::Visit(CommandNode* node)
   pid_t pid = fork();
 
   if (pid == 0) { // Child
+    // New group
+    pid_t childPid = getpid();
+    setpgid(childPid, childPid);
+
     // Signal recovery
     signal(SIGINT, SIG_DFL);
     signal(SIGTSTP, SIG_DFL);
+    signal(SIGQUIT, SIG_DFL);
+    signal(SIGTTOU, SIG_DFL);
+    signal(SIGTTIN, SIG_DFL);
+
+    // Get terminal
+    tcsetpgrp(STDIN_FILENO, childPid);
 
     if (!ApplyRedirects(node->redirects))
-      exit(1);
+      _exit(1);
 
     std::string execPath = FindCommand(node->command);
 
     if (execPath.empty()) {
       std::cerr << node->command << ": command not found\n";
 
-      exit(127);
+      _exit(127);
     }
+
     std::vector<char*> args;
 
     args.push_back(const_cast<char*>(node->command.c_str()));
@@ -107,18 +118,42 @@ HollowExecutor::Visit(CommandNode* node)
     execv(execPath.c_str(), args.data());
     perror("Execv failed");
 
-    exit(126);
+    _exit(126);
   } else if (pid < 0) {
     perror("Fork");
 
     return 1;
   } else {
-    int status;
+    // Race condition protection
+    setpgid(pid, pid);
 
-    waitpid(pid, &status, 0);
+    tcsetpgrp(STDIN_FILENO, pid);
+
+    int status;
+    waitpid(pid, &status, WUNTRACED);
+
+    tcsetpgrp(STDIN_FILENO, getpgrp());
 
     if (WIFEXITED(status))
       return WEXITSTATUS(status);
+
+    if (WIFSIGNALED(status)) {
+      int sig = WTERMSIG(status);
+
+      if (sig == SIGINT)
+        std::cout << std::endl;
+
+      return 128 + sig;
+    }
+
+    if (WIFSTOPPED(status)) {
+      int jobId = HollowJob::GetInstance().AddJob(pid, node->command);
+
+      std::cout << "\n[" << jobId << "]+ Stopped    " << node->command
+                << std::endl;
+      
+      return 148;
+    }
 
     return 1;
   }
@@ -201,8 +236,7 @@ HollowExecutor::Visit(BackgroundNode* node)
 
     exit(Execute(node->command.get()));
   } else {
-    std::string cmdStr =
-      "Background task";
+    std::string cmdStr = "Background task";
 
     int jobId = HollowJob::GetInstance().AddJob(pid, cmdStr);
 
@@ -228,6 +262,7 @@ HollowExecutor::Visit(SubshellNode* node)
   if (pid == 0) { // CHILD (Subshell Environment)
     signal(SIGINT, SIG_DFL);
     signal(SIGTSTP, SIG_DFL);
+    signal(SIGQUIT, SIG_DFL);
 
     if (!ApplyRedirects(node->redirects))
       exit(1);
